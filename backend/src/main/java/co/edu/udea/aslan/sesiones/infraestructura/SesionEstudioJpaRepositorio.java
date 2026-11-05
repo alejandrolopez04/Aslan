@@ -1,0 +1,11 @@
+package co.edu.udea.aslan.sesiones.infraestructura;
+
+import org.springframework.data.jpa.repository.JpaRepository;
+
+import java.util.Optional;
+import java.util.UUID;
+
+interface SesionEstudioJpaRepositorio extends JpaRepository<SesionEstudioEntidad, UUID> {
+
+    Optional<SesionEstudioEntidad> findFirstByEstudianteIdAndFinIsNull(UUID estudianteId);
+}

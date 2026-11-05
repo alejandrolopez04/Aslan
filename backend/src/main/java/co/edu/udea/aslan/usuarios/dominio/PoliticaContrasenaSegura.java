@@ -1,19 +1,31 @@
 package co.edu.udea.aslan.usuarios.dominio;
 
-public class PoliticaContrasenaSegura {
+import java.util.ArrayList;
+import java.util.List;
 
-    static final int LONGITUD_MINIMA = 8;
+public class PoliticaContrasenaSegura implements IPoliticaContrasena {
 
-    public boolean esValida(String contrasena) {
-        return contrasena != null
-                && contrasena.length() >= LONGITUD_MINIMA
-                && contrasena.chars().anyMatch(Character::isLetter)
-                && contrasena.chars().anyMatch(Character::isDigit);
+    private static final int LONGITUD_MINIMA = 8;
+
+    @Override
+    public ResultadoValidacion validar(String contrasena) {
+        String texto = contrasena == null ? "" : contrasena;
+        List<String> errores = new ArrayList<>();
+        if (texto.length() < LONGITUD_MINIMA) {
+            errores.add("Debe tener al menos " + LONGITUD_MINIMA + " caracteres.");
+        }
+        if (texto.chars().noneMatch(Character::isLetter)) {
+            errores.add("Debe incluir al menos una letra.");
+        }
+        if (texto.chars().noneMatch(Character::isDigit)) {
+            errores.add("Debe incluir al menos un número.");
+        }
+        return ResultadoValidacion.con(errores);
     }
 
-    public void verificar(String contrasena) {
-        if (!esValida(contrasena)) {
-            throw new ContrasenaInseguraException();
-        }
+    @Override
+    public String describirRequisitos() {
+        return "La contraseña aún no es válida. Debe tener al menos " + LONGITUD_MINIMA
+                + " caracteres, una letra y un número.";
     }
 }

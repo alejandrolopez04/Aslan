@@ -9,6 +9,9 @@ spring:
     open-in-view: false
     hibernate:
       ddl-auto: update
+  jackson:
+    mapper:
+      accept-case-insensitive-enums: true
   flyway:
     locations: classpath:db/migration
 
@@ -18,3 +21,5 @@ server:
 aslan:
   cors:
     origenes: ${ASLAN_CORS_ORIGENES:http://localhost:8443,http://localhost:5173}
+  jwt:
+    secreto: ${ASLAN_JWT_SECRETO:solo-para-desarrollo-local-cambiar-en-render-2026}

@@ -40,7 +40,7 @@ class InicioSesionIntegracionTest {
                 .andExpect(status().isCreated());
 
         login("segura123").andExpect(status().isOk()).andExpect(jsonPath("$.token").isNotEmpty());
-        assertThat(jdbc.queryForObject("SELECT count(*) FROM tokens_sesion", Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT count(*) FROM sesiones_autenticacion WHERE activa", Integer.class)).isEqualTo(1);
 
         for (int i = 0; i < 4; i++) {
             login("mala").andExpect(status().isUnauthorized());

@@ -43,6 +43,8 @@ class RegistroIntegracionTest {
 
         String hash = jdbc.queryForObject(
                 "SELECT contrasena_hash FROM cuentas WHERE correo = 'sofia@aslan.app'", String.class);
+        assertThat(jdbc.queryForObject("SELECT nombre FROM estudiantes e JOIN cuentas c ON c.estudiante_id = e.id"
+                + " WHERE c.correo = 'sofia@aslan.app'", String.class)).isEqualTo("Sofía");
         assertThat(hash).startsWith("$2").isNotEqualTo("segura123");
 
         mockMvc.perform(post("/api/auth/registro").contentType(MediaType.APPLICATION_JSON).content(cuerpo))

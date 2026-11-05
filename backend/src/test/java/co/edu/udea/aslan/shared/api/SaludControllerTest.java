@@ -1,6 +1,7 @@
 package co.edu.udea.aslan.shared.api;
 
 import co.edu.udea.aslan.shared.aplicacion.EstadoSalud;
+import co.edu.udea.aslan.shared.aplicacion.IValidadorAcceso;
 import co.edu.udea.aslan.shared.aplicacion.ServicioSalud;
 import co.edu.udea.aslan.shared.infraestructura.ConfiguracionCors;
 import org.junit.jupiter.api.Test;
@@ -25,6 +26,9 @@ class SaludControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
+
+    @MockitoBean
+    private IValidadorAcceso validador;
 
     @MockitoBean
     private ServicioSalud servicioSalud;

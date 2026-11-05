@@ -1,3 +1,5 @@
+import { getJson, postJson, unwrap } from "./http";
+
 export type SubjectColor = "red" | "blue" | "green" | "amber" | "purple";
 export type SubjectIcon = "book" | "code" | "science" | "language" | "calculator";
 export type TopicStatus = "Pendiente" | "En progreso" | "Completado";
@@ -28,7 +30,7 @@ export type TopicInput = Omit<Topic, "id" | "mastery" | "scheduledReviews">;
 
 export interface CatalogGateway {
   listSubjects(userId: string): Promise<Subject[]>;
-  createSubject(userId: string, input: SubjectInput): Promise<Subject>;
+  createSubject(userId: string, input: SubjectInput, confirmDuplicate?: boolean): Promise<Subject>;
   updateSubject(subjectId: string, input: SubjectInput): Promise<Subject>;
   setSubjectArchived(subjectId: string, archived: boolean): Promise<Subject>;
   deleteSubject(subjectId: string): Promise<void>;
@@ -38,83 +40,59 @@ export interface CatalogGateway {
   exportCatalog(subjects: Subject[], format: "pdf" | "csv" | "json"): Promise<Blob>;
 }
 
-const seedSubjects: Subject[] = [
-  {
-    id: "subject_math",
-    name: "Matemáticas",
-    color: "red",
-    icon: "calculator",
-    archived: false,
-    topics: [
-      {
-        id: "topic_integrals",
-        name: "Integrales por sustitución",
-        status: "En progreso",
-        priority: "Alta",
-        dueDate: "2000-01-12",
-        notes: "Revisar cambio de variable y resolver los ejercicios 12 al 18.",
-        mastery: 42,
-        scheduledReviews: 2,
-      },
-      {
-        id: "topic_derivatives",
-        name: "Derivadas parciales",
-        status: "Completado",
-        priority: "Media",
-        dueDate: "2026-12-20",
-        notes: "Diferenciar manteniendo constantes las demás variables.",
-        mastery: 81,
-        scheduledReviews: 1,
-      },
-      {
-        id: "topic_series",
-        name: "Series y sucesiones",
-        status: "Pendiente",
-        priority: "Alta",
-        dueDate: new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10),
-        notes: "",
-        mastery: 28,
-        scheduledReviews: 3,
-      },
-    ],
-  },
-  {
-    id: "subject_code",
-    name: "Programación",
-    color: "blue",
-    icon: "code",
-    archived: false,
-    topics: [
-      {
-        id: "topic_spring",
-        name: "Spring Boot",
-        status: "En progreso",
-        priority: "Alta",
-        dueDate: "2026-07-10",
-        notes: "Repasar controladores, servicios y manejo global de excepciones.",
-        mastery: 57,
-        scheduledReviews: 2,
-      },
-      {
-        id: "topic_testing",
-        name: "Pruebas unitarias",
-        status: "Pendiente",
-        priority: "Media",
-        notes: "",
-        scheduledReviews: 0,
-      },
-    ],
-  },
-  {
-    id: "subject_history",
-    name: "Historia",
-    color: "amber",
-    icon: "book",
-    archived: true,
-    topics: [],
-  },
-];
+type ApiTopic = {
+  id: string;
+  nombre: string;
+  estado: "PENDIENTE" | "EN_PROGRESO" | "COMPLETADO";
+  prioridad: "BAJA" | "MEDIA" | "ALTA";
+  fechaLimite: string | null;
+  notas: string;
+};
 
+type ApiSubject = {
+  id: string;
+  nombre: string;
+  color: SubjectColor;
+  icono: SubjectIcon;
+  archivada: boolean;
+  temas: ApiTopic[];
+};
+
+const STATUS: Record<ApiTopic["estado"], TopicStatus> = {
+  PENDIENTE: "Pendiente",
+  EN_PROGRESO: "En progreso",
+  COMPLETADO: "Completado",
+};
+const PRIORITY: Record<ApiTopic["prioridad"], TopicPriority> = { BAJA: "Baja", MEDIA: "Media", ALTA: "Alta" };
+
+function apiKey<K extends string, V>(map: Record<K, V>, value: V) {
+  return (Object.keys(map) as K[]).find((key) => map[key] === value);
+}
+
+function toTopic(topic: ApiTopic): Topic {
+  return {
+    id: topic.id,
+    name: topic.nombre,
+    status: STATUS[topic.estado],
+    priority: PRIORITY[topic.prioridad],
+    dueDate: topic.fechaLimite ?? undefined,
+    notes: topic.notas,
+    scheduledReviews: 0,
+  };
+}
+
+function toSubject(subject: ApiSubject): Subject {
+  return {
+    id: subject.id,
+    name: subject.nombre,
+    color: subject.color,
+    icon: subject.icono,
+    archived: subject.archivada,
+    topics: subject.temas.map(toTopic),
+  };
+}
+
+// HU14, HU15, HU17 y HU18 aún no tienen endpoint: sus cambios solo viven en esta copia local.
 let subjects: Subject[] = [];
 
 function findSubject(subjectId: string) {
@@ -160,10 +138,16 @@ function createSimplePdf(lines: string[]) {
 
 export const catalogGateway: CatalogGateway = {
   async listSubjects(_userId) {
+    subjects = unwrap(await getJson<ApiSubject[]>("/api/materias")).map(toSubject);
     return structuredClone(subjects);
   },
-  async createSubject(_userId, input) {
-    const subject: Subject = { id: crypto.randomUUID(), ...input, archived: false, topics: [] };
+  async createSubject(_userId, input, confirmDuplicate = false) {
+    const subject = toSubject(unwrap(await postJson<ApiSubject>("/api/materias", {
+      nombre: input.name,
+      color: input.color,
+      icono: input.icon,
+      confirmarDuplicado: confirmDuplicate,
+    })));
     subjects.push(subject);
     return structuredClone(subject);
   },
@@ -179,7 +163,13 @@ export const catalogGateway: CatalogGateway = {
     subjects = subjects.filter((subject) => subject.id !== subjectId);
   },
   async createTopic(subjectId, input) {
-    const topic: Topic = { id: crypto.randomUUID(), ...input, scheduledReviews: 0 };
+    const topic = toTopic(unwrap(await postJson<ApiTopic>(`/api/materias/${subjectId}/temas`, {
+      nombre: input.name,
+      estado: apiKey(STATUS, input.status),
+      prioridad: apiKey(PRIORITY, input.priority),
+      fechaLimite: input.dueDate || null,
+      notas: input.notes,
+    })));
     findSubject(subjectId).topics.push(topic);
     return structuredClone(topic);
   },

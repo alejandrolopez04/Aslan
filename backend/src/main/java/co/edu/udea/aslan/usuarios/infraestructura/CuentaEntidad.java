@@ -14,19 +14,14 @@ import java.util.UUID;
 class CuentaEntidad {
 
     @Id
-    private UUID id;
-
-    @Column(nullable = false, length = 120)
-    private String nombre;
+    @Column(name = "estudiante_id")
+    private UUID estudianteId;
 
     @Column(nullable = false, unique = true, length = 254)
     private String correo;
 
     @Column(name = "contrasena_hash", nullable = false, length = 100)
     private String contrasenaHash;
-
-    @Column(name = "creada_en", nullable = false)
-    private Instant creadaEn;
 
     @Column(name = "intentos_fallidos", nullable = false)
     private int intentosFallidos;
@@ -39,17 +34,15 @@ class CuentaEntidad {
 
     static CuentaEntidad desde(Cuenta cuenta) {
         CuentaEntidad entidad = new CuentaEntidad();
-        entidad.id = cuenta.getId();
-        entidad.nombre = cuenta.getNombre();
+        entidad.estudianteId = cuenta.getEstudianteId();
         entidad.correo = cuenta.getCorreo();
         entidad.contrasenaHash = cuenta.getContrasenaHash();
-        entidad.creadaEn = cuenta.getCreadaEn();
         entidad.intentosFallidos = cuenta.getIntentosFallidos();
         entidad.bloqueadaHasta = cuenta.getBloqueadaHasta().orElse(null);
         return entidad;
     }
 
     Cuenta aDominio() {
-        return new Cuenta(id, nombre, correo, contrasenaHash, creadaEn, intentosFallidos, bloqueadaHasta);
+        return new Cuenta(estudianteId, correo, contrasenaHash, intentosFallidos, bloqueadaHasta);
     }
 }
