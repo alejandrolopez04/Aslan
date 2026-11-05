@@ -1,0 +1,33 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: aslan-postgres
+    environment:
+      POSTGRES_DB: aslan
+      POSTGRES_USER: aslan
+      POSTGRES_PASSWORD: aslan
+    ports:
+      - "5433:5432"
+    volumes:
+      - aslan-datos:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aslan -d aslan"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: aslan-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/aslan
+      SPRING_DATASOURCE_USERNAME: aslan
+      SPRING_DATASOURCE_PASSWORD: aslan
+    ports:
+      - "8080:8080"
+
+volumes:
+  aslan-datos:
