@@ -28,6 +28,12 @@ class CuentaEntidad {
     @Column(name = "creada_en", nullable = false)
     private Instant creadaEn;
 
+    @Column(name = "intentos_fallidos", nullable = false)
+    private int intentosFallidos;
+
+    @Column(name = "bloqueada_hasta")
+    private Instant bloqueadaHasta;
+
     protected CuentaEntidad() {
     }
 
@@ -38,10 +44,12 @@ class CuentaEntidad {
         entidad.correo = cuenta.getCorreo();
         entidad.contrasenaHash = cuenta.getContrasenaHash();
         entidad.creadaEn = cuenta.getCreadaEn();
+        entidad.intentosFallidos = cuenta.getIntentosFallidos();
+        entidad.bloqueadaHasta = cuenta.getBloqueadaHasta().orElse(null);
         return entidad;
     }
 
     Cuenta aDominio() {
-        return new Cuenta(id, nombre, correo, contrasenaHash, creadaEn);
+        return new Cuenta(id, nombre, correo, contrasenaHash, creadaEn, intentosFallidos, bloqueadaHasta);
     }
 }

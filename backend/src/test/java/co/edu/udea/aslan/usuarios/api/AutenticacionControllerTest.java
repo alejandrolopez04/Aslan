@@ -1,6 +1,7 @@
 package co.edu.udea.aslan.usuarios.api;
 
-import co.edu.udea.aslan.usuarios.aplicacion.CuentaRegistrada;
+import co.edu.udea.aslan.usuarios.aplicacion.ResumenCuenta;
+import co.edu.udea.aslan.usuarios.aplicacion.ServicioAutenticacion;
 import co.edu.udea.aslan.usuarios.aplicacion.ServicioRegistro;
 import co.edu.udea.aslan.usuarios.aplicacion.SolicitudRegistro;
 import co.edu.udea.aslan.usuarios.dominio.ContrasenaInseguraException;
@@ -31,11 +32,14 @@ class AutenticacionControllerTest {
     @MockitoBean
     private ServicioRegistro servicioRegistro;
 
+    @MockitoBean
+    private ServicioAutenticacion servicioAutenticacion;
+
     @Test
     void registroExitosoDevuelve201ConLaCuenta() throws Exception {
         UUID id = UUID.randomUUID();
         when(servicioRegistro.registrar(new SolicitudRegistro("María Parra", "maria@udea.edu.co", "segura123")))
-                .thenReturn(new CuentaRegistrada(id, "María Parra", "maria@udea.edu.co"));
+                .thenReturn(new ResumenCuenta(id, "María Parra", "maria@udea.edu.co"));
 
         registrar("""
                 {"nombre":"María Parra","correo":"maria@udea.edu.co","contrasena":"segura123"}""")

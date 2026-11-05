@@ -50,7 +50,7 @@ class ServicioRegistroTest {
         when(cifrador.cifrar("segura123")).thenReturn("hash-bcrypt");
         when(repositorio.guardar(any())).thenAnswer(invocacion -> invocacion.getArgument(0));
 
-        CuentaRegistrada registrada = servicio.registrar(
+        ResumenCuenta registrada = servicio.registrar(
                 new SolicitudRegistro("María Parra", "Maria@UdeA.edu.co", "segura123"));
 
         ArgumentCaptor<Cuenta> guardada = ArgumentCaptor.forClass(Cuenta.class);

@@ -1,6 +1,10 @@
 const API_URL = (import.meta.env.VITE_API_URL ?? "http://localhost:8080").replace(/\/$/, "");
 
-export type ApiError = { codigo: string; mensaje: string };
+export type ApiError = {
+  codigo: string;
+  mensaje: string;
+  detalles?: Record<string, string>;
+};
 
 export type ApiResult<T> =
   | { ok: true; status: number; data: T }
@@ -11,12 +15,21 @@ const NETWORK_ERROR: ApiError = {
   mensaje: "No pudimos conectar con el servidor. Inténtalo de nuevo en unos minutos.",
 };
 
+let authToken: string | null = null;
+
+export function setAuthToken(token: string | null) {
+  authToken = token;
+}
+
 export async function postJson<T>(path: string, body: unknown): Promise<ApiResult<T>> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (authToken) headers.Authorization = `Bearer ${authToken}`;
+
   let response: Response;
   try {
     response = await fetch(`${API_URL}${path}`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(body),
     });
   } catch {

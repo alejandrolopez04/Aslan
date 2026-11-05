@@ -1,5 +1,7 @@
 package co.edu.udea.aslan.shared.dominio;
 
+import java.util.Map;
+
 public abstract class ExcepcionNegocio extends RuntimeException {
 
     private final String codigo;
@@ -17,5 +19,9 @@ public abstract class ExcepcionNegocio extends RuntimeException {
 
     public TipoError getTipo() {
         return tipo;
+    }
+
+    public Map<String, Object> getDetalles() {
+        return Map.of();
     }
 }
