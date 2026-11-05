@@ -1,3 +1,5 @@
+import { postJson } from "./http";
+
 export type User = {
   id: string;
   name: string;
@@ -8,16 +10,27 @@ export type AuthErrorCode =
   | "EMAIL_IN_USE"
   | "INVALID_CREDENTIALS"
   | "LOCKED"
-  | "CURRENT_PASSWORD_INVALID";
+  | "CURRENT_PASSWORD_INVALID"
+  | "INVALID_DATA"
+  | "SERVER_ERROR";
 
 export type AuthResult<T> =
   | { ok: true; data: T }
   | {
       ok: false;
       code: AuthErrorCode;
+      message?: string;
       attemptsRemaining?: number;
       lockedUntil?: number;
     };
+
+type RegisteredAccount = { id: string; nombre: string; correo: string };
+
+const REGISTER_ERRORS: Record<string, AuthErrorCode> = {
+  CORREO_EN_USO: "EMAIL_IN_USE",
+  CONTRASENA_INSEGURA: "INVALID_DATA",
+  DATOS_INVALIDOS: "INVALID_DATA",
+};
 
 export type ProfileChanges = {
   name: string;
@@ -63,19 +76,23 @@ function publicUser(user: StoredUser): User {
  */
 export const authGateway: AuthGateway = {
   async register(name, email, password) {
-    const normalizedEmail = normalizeEmail(email);
-    if (users.some((user) => user.email === normalizedEmail)) {
-      return { ok: false, code: "EMAIL_IN_USE" };
+    const result = await postJson<RegisteredAccount>("/api/auth/registro", {
+      nombre: name,
+      correo: email,
+      contrasena: password,
+    });
+    if (!result.ok) {
+      return {
+        ok: false,
+        code: REGISTER_ERRORS[result.error.codigo] ?? "SERVER_ERROR",
+        message: result.error.mensaje,
+      };
     }
 
-    const user: StoredUser = {
-      id: crypto.randomUUID(),
-      name: name.trim(),
-      email: normalizedEmail,
-      password,
-    };
-    users.push(user);
-    return { ok: true, data: publicUser(user) };
+    const user: User = { id: result.data.id, name: result.data.nombre, email: result.data.correo };
+    // Mientras HU02 no esté conectada, el login simulado necesita conocer la cuenta nueva.
+    users.push({ ...user, password });
+    return { ok: true, data: user };
   },
 
   async login(email, password) {
