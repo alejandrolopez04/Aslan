@@ -1,6 +1,5 @@
 package co.edu.udea.aslan.usuarios.api;
 
-import co.edu.udea.aslan.usuarios.aplicacion.SolicitudRegistro;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -18,8 +17,4 @@ public record SolicitudRegistroDto(
 
         @NotNull(message = "La contraseña no cumple todos los requisitos.")
         String contrasena) {
-
-    SolicitudRegistro aSolicitud() {
-        return new SolicitudRegistro(nombre, correo, contrasena);
-    }
 }

@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -16,7 +17,7 @@ class CuentaBloqueoTest {
 
     @BeforeEach
     void preparar() {
-        cuenta = Cuenta.registrar("María", "maria@udea.edu.co", "hash", AHORA);
+        cuenta = Cuenta.abrir(UUID.randomUUID(), "maria@udea.edu.co", "hash");
     }
 
     @Test
@@ -40,7 +41,7 @@ class CuentaBloqueoTest {
     @Test
     void unIngresoExitosoReiniciaElContador() {
         fallar(4, AHORA);
-        cuenta.registrarIngresoExitoso();
+        cuenta.reiniciarIntentos();
         fallar(4, AHORA);
 
         assertThat(cuenta.estaBloqueada(AHORA)).isFalse();

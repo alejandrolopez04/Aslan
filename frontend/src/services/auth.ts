@@ -25,7 +25,8 @@ export type AuthResult<T> =
     };
 
 type AccountSummary = { id: string; nombre: string; correo: string };
-type StartedSession = { token: string; expiraEn: string; cuenta: AccountSummary };
+type StartedSession = { token: string; expiracion: string };
+type TokenClaims = { sub: string; nombre: string; correo: string };
 
 const ERROR_CODES: Record<string, AuthErrorCode> = {
   CORREO_EN_USO: "EMAIL_IN_USE",
@@ -62,13 +63,19 @@ function toUser(account: AccountSummary): User {
   return { id: account.id, name: account.nombre, email: account.correo };
 }
 
+function decodeClaims(token: string): TokenClaims {
+  const payload = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+  const json = new TextDecoder().decode(Uint8Array.from(atob(payload), (c) => c.charCodeAt(0)));
+  return JSON.parse(json) as TokenClaims;
+}
+
 function failure(error: ApiError): AuthResult<never> {
   const lockedUntil = error.detalles?.bloqueadaHasta;
   return {
     ok: false,
     code: ERROR_CODES[error.codigo] ?? "SERVER_ERROR",
     message: error.mensaje,
-    lockedUntil: lockedUntil ? Date.parse(lockedUntil) : undefined,
+    lockedUntil: lockedUntil ? Date.parse(String(lockedUntil)) : undefined,
   };
 }
 
@@ -96,7 +103,8 @@ export const authGateway: AuthGateway = {
     if (!result.ok) return failure(result.error);
 
     setAuthToken(result.data.token);
-    const user = toUser(result.data.cuenta);
+    const claims = decodeClaims(result.data.token);
+    const user = toUser({ id: claims.sub, nombre: claims.nombre, correo: claims.correo });
     profiles.set(user.id, { ...user, password });
     return { ok: true, data: user };
   },
@@ -121,6 +129,7 @@ export const authGateway: AuthGateway = {
   },
 
   async logout() {
+    await postJson<void>("/api/auth/logout");
     setAuthToken(null);
   },
 };

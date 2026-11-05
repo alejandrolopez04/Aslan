@@ -24,8 +24,11 @@ import notificationsIcon from "./imports/notifications.svg"
 import settingsIcon from "./imports/settings.svg"
 import sidebarToggleIcon from "./imports/sidebar-toggle.svg"
 import { authGateway, type AuthErrorCode, type User } from "./services/auth"
+import { ApiFailure, setAuthToken, setUnauthorizedHandler } from "./services/http"
 import {
   studyGateway,
+  SOUNDS,
+  type CycleAction,
   type SessionSummary,
   type StudySession,
   type StudySettings,
@@ -2462,6 +2465,7 @@ function SubjectFormDialog({
   const [color, setColor] = useState<SubjectColor>(editing?.color ?? "red")
   const [icon, setIcon] = useState<SubjectIcon>(editing?.icon ?? "book")
   const [error, setError] = useState("")
+  const [confirmDuplicate, setConfirmDuplicate] = useState(false)
   const colors: SubjectColor[] = ["red", "blue", "green", "amber", "purple"]
   const icons: SubjectIcon[] = [
     "book",
@@ -2477,28 +2481,38 @@ function SubjectFormDialog({
       setError("Ingresa un nombre para la materia.")
       return
     }
-    if (
-      subjects.some(
-        (subject) =>
-          subject.id !== editing?.id &&
-          subject.name.toLowerCase() === name.trim().toLowerCase(),
+    const duplicated = subjects.some(
+      (subject) =>
+        subject.id !== editing?.id &&
+        subject.name.toLowerCase() === name.trim().toLowerCase(),
+    )
+    if (duplicated && !confirmDuplicate) {
+      setError(
+        "Ya existe una materia con este nombre. Guarda de nuevo para crearla de todos modos.",
       )
-    ) {
-      setError("Ya existe una materia con este nombre.")
+      setConfirmDuplicate(true)
       return
     }
-    if (editing)
-      await catalogGateway.updateSubject(editing.id, {
-        name: name.trim(),
-        color,
-        icon,
-      })
-    else
-      await catalogGateway.createSubject("current-user", {
-        name: name.trim(),
-        color,
-        icon,
-      })
+    try {
+      if (editing)
+        await catalogGateway.updateSubject(editing.id, {
+          name: name.trim(),
+          color,
+          icon,
+        })
+      else
+        await catalogGateway.createSubject(
+          "current-user",
+          { name: name.trim(), color, icon },
+          confirmDuplicate,
+        )
+    } catch (failure) {
+      if (failure instanceof ApiFailure && failure.error.codigo === "MATERIA_DUPLICADA") {
+        setConfirmDuplicate(true)
+      }
+      setError(failure instanceof Error ? failure.message : "No pudimos guardar la materia.")
+      return
+    }
     onSaved()
   }
 
@@ -2523,6 +2537,7 @@ function SubjectFormDialog({
             onChange={(value) => {
               setName(value)
               setError("")
+              setConfirmDuplicate(false)
             }}
             autoComplete="off"
             error={error || undefined}
@@ -2612,8 +2627,13 @@ function TopicFormDialog({
       dueDate: dueDate || undefined,
       notes,
     }
-    if (editing) await catalogGateway.updateTopic(subject.id, editing.id, input)
-    else await catalogGateway.createTopic(subject.id, input)
+    try {
+      if (editing) await catalogGateway.updateTopic(subject.id, editing.id, input)
+      else await catalogGateway.createTopic(subject.id, input)
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "No pudimos guardar el tema.")
+      return
+    }
     onSaved()
   }
 
@@ -4718,41 +4738,51 @@ function StudySetupScreen({
   const [sound, setSound] = useState("")
   const [suggestion, setSuggestion] = useState<StudySuggestion | null>(null)
   const [submitted, setSubmitted] = useState(false)
+  const [startError, setStartError] = useState("")
   const selectedSubject = subjects.find(
   (item) => !item.archived && item.name === subject,
 )
 const availableTopics = selectedSubject?.topics ?? []
+const selectedTopic = availableTopics.find((item) => item.name === topic)
 
   useEffect(() => {
-    if (!subject || !topic.trim()) {
+    if (!selectedSubject || !selectedTopic) {
       setSuggestion(null)
       return
     }
     let active = true
-    studyGateway.getSuggestion(user.id, subject, topic).then((result) => {
-      if (!active) return
-      setSuggestion(result)
-      setSound(result.sound)
-    })
+    studyGateway
+      .getSuggestion(selectedSubject.id, selectedTopic.id)
+      .then((result) => {
+        if (!active) return
+        setSuggestion(result)
+        setSound(result.sound)
+      })
+      .catch(() => setSuggestion(null))
     return () => {
       active = false
     }
-  }, [subject, topic, user.id])
+  }, [selectedSubject?.id, selectedTopic?.id])
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setSubmitted(true)
-    if (!subject || !topic.trim()) return
-    const selectedSuggestion =
-      suggestion ?? (await studyGateway.getSuggestion(user.id, subject, topic))
-    const session = await studyGateway.startSession({
-      subject,
-      topic: topic.trim(),
-      sound: sound || selectedSuggestion.sound,
-      technique: selectedSuggestion.technique,
-      plannedCycles: 4,
-    })
-    onStart(session)
+    setStartError("")
+    if (!selectedSubject || !selectedTopic) return
+    try {
+      const session = await studyGateway.startSession({
+        subjectId: selectedSubject.id,
+        topicId: selectedTopic.id,
+        subject,
+        topic,
+        sound: sound || undefined,
+      })
+      onStart(session)
+    } catch (failure) {
+      setStartError(
+        failure instanceof Error ? failure.message : "No pudimos iniciar la sesión.",
+      )
+    }
   }
 
 return (
@@ -4860,14 +4890,13 @@ return (
                   onChange={(event) => setSound(event.target.value)}
                 >
                   <option value="">Selecciona un ambiente</option>
-                  <option>Silencio</option>
-                  <option>Ruido marrón</option>
-                  <option>Café tranquilo</option>
-                  <option>Lluvia suave</option>
-                  <option>Música instrumental</option>
+                  {Object.values(SOUNDS).map((label) => (
+                    <option key={label}>{label}</option>
+                  ))}
                 </select>
               </div>
             </div>
+            {startError && <p className="field-error">{startError}</p>}
             <button className="submit-button" type="submit">
               Iniciar sesión<span aria-hidden="true">→</span>
             </button>
@@ -5219,7 +5248,7 @@ function StudySessionScreen({
   const [phase, setPhase] = useState<"ready" | "running" | "paused" | "break">(
     "ready",
   )
-  const [secondsLeft, setSecondsLeft] = useState(settings.pomodoroMinutes * 60)
+  const [secondsLeft, setSecondsLeft] = useState(initialSession.cycle.plannedSeconds)
   const [interruptionOpen, setInterruptionOpen] = useState(false)
   const [finishOpen, setFinishOpen] = useState(false)
   const [concentration, setConcentration] = useState(
@@ -5229,13 +5258,31 @@ function StudySessionScreen({
   const [analysisNotice, setAnalysisNotice] = useState<string | null>(null)
   const [notesOpen, setNotesOpen] = useState(false)
 
-  async function finish(completed: boolean) {
-    const summary = await studyGateway.finishSession(
-      session,
-      concentration,
-      completed,
-    )
-    onFinished(summary)
+  const elapsed = () => session.cycle.plannedSeconds - secondsLeft
+
+  async function finish(saveProgress: boolean) {
+    const finished = await studyGateway.finishSession(session, elapsed(), saveProgress)
+    if (saveProgress) onFinished(studyGateway.summarize(finished, concentration))
+    else onDiscard()
+  }
+
+  async function changeCycle(action: CycleAction, nextPhase?: typeof phase) {
+    const updated = await studyGateway.changeCycle(session, action, elapsed())
+    setSession(updated)
+    if (updated.finished) {
+      onFinished(studyGateway.summarize(updated, concentration))
+      return
+    }
+    if (action === "siguiente") {
+      const isBreak = updated.cycle.kind !== "TRABAJO"
+      setPhase(isBreak ? "break" : "ready")
+      setSecondsLeft(updated.cycle.plannedSeconds)
+      setAnalysisNotice(
+        isBreak ? null : "Descanso terminado. Tu siguiente ciclo está listo.",
+      )
+    } else if (nextPhase) {
+      setPhase(nextPhase)
+    }
   }
 
   function registerDistraction() {
@@ -5272,25 +5319,8 @@ function StudySessionScreen({
   }, [phase])
 
   useEffect(() => {
-    if (secondsLeft !== 0) return
-    if (phase === "running") {
-      const completedCycles = session.completedCycles + 1
-      const updated = { ...session, completedCycles }
-      setSession(updated)
-      if (completedCycles >= session.plannedCycles) {
-        studyGateway
-          .finishSession(updated, concentration, true)
-          .then(onFinished)
-      } else {
-        setPhase("break")
-        setSecondsLeft(completedCycles % 4 === 0 ? 15 * 60 : 5 * 60)
-        setAnalysisNotice(null)
-      }
-    } else if (phase === "break") {
-      setPhase("ready")
-      setSecondsLeft(settings.pomodoroMinutes * 60)
-      setAnalysisNotice("Descanso terminado. Tu siguiente ciclo está listo.")
-    }
+    if (secondsLeft !== 0 || (phase !== "running" && phase !== "break")) return
+    changeCycle("siguiente")
   }, [secondsLeft, phase])
 
   async function saveInterruption(reason?: string) {
@@ -5306,7 +5336,7 @@ function StudySessionScreen({
   const minutes = String(Math.floor(secondsLeft / 60)).padStart(2, "0")
   const seconds = String(secondsLeft % 60).padStart(2, "0")
   const progress =
-    phase === "break" ? 0 : 1 - secondsLeft / (settings.pomodoroMinutes * 60)
+    phase === "break" ? 0 : 1 - secondsLeft / session.cycle.plannedSeconds
 
   return (
     <main className="dashboard">
@@ -5332,7 +5362,11 @@ function StudySessionScreen({
           <button
             type="button"
             className="secondary-button"
-            onClick={() => setFinishOpen(true)}
+            onClick={() =>
+              session.cycle.state === "EN_CURSO" || session.cycle.state === "PAUSADO"
+                ? setFinishOpen(true)
+                : finish(true)
+            }
           >
             Finalizar sesión
           </button>
@@ -5377,7 +5411,7 @@ function StudySessionScreen({
                 <button
                   className="submit-button"
                   type="button"
-                  onClick={() => setPhase("running")}
+                  onClick={() => changeCycle("iniciar", "running")}
                 >
                   Iniciar ciclo
                 </button>
@@ -5386,7 +5420,7 @@ function StudySessionScreen({
                 <button
                   className="submit-button"
                   type="button"
-                  onClick={() => setPhase("running")}
+                  onClick={() => changeCycle("reanudar", "running")}
                 >
                   Reanudar
                 </button>
@@ -5395,7 +5429,7 @@ function StudySessionScreen({
                 <button
                   className="submit-button"
                   type="button"
-                  onClick={() => setPhase("paused")}
+                  onClick={() => changeCycle("pausar", "paused")}
                 >
                   Pausar
                 </button>
@@ -5404,10 +5438,7 @@ function StudySessionScreen({
                 <button
                   className="submit-button"
                   type="button"
-                  onClick={() => {
-                    setPhase("ready")
-                    setSecondsLeft(settings.pomodoroMinutes * 60)
-                  }}
+                  onClick={() => changeCycle("siguiente")}
                 >
                   Omitir descanso
                 </button>
@@ -5417,7 +5448,7 @@ function StudySessionScreen({
                   className="secondary-button"
                   type="button"
                   onClick={() => {
-                    setPhase("paused")
+                    if (phase === "running") changeCycle("pausar", "paused")
                     setInterruptionOpen(true)
                   }}
                 >
@@ -5480,8 +5511,8 @@ function StudySessionScreen({
       {finishOpen && (
         <FinishStudyDialog
           onCancel={() => setFinishOpen(false)}
-          onDiscard={onDiscard}
-          onSave={() => finish(false)}
+          onDiscard={() => finish(false)}
+          onSave={() => finish(true)}
         />
       )}
       {notesOpen && (
@@ -5784,6 +5815,18 @@ export default function App() {
   }, [user])
 
   useEffect(() => {
+    if (user) studyGateway.getSettings().then(setSettings).catch(() => undefined)
+  }, [user])
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setAuthToken(null)
+      resetSession()
+    })
+    return () => setUnauthorizedHandler(null)
+  }, [])
+
+  useEffect(() => {
     if (user) reviewGateway.list(user.id).then(setReviews)
     else setReviews([])
   }, [user])
@@ -5927,10 +5970,16 @@ export default function App() {
   }
 
   async function confirmLogout(saveProgress: boolean) {
-    if (saveProgress && activeSession) {
-      await studyGateway.finishSession(activeSession, null, false)
+    if (activeSession) {
+      await studyGateway
+        .finishSession(activeSession, 0, saveProgress)
+        .catch(() => undefined)
     }
     await authGateway.logout()
+    resetSession()
+  }
+
+  function resetSession() {
     setUser(null)
     setActiveSession(null)
     setSummary(null)

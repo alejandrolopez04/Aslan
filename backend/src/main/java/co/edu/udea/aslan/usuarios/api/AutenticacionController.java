@@ -1,13 +1,13 @@
 package co.edu.udea.aslan.usuarios.api;
 
-import co.edu.udea.aslan.usuarios.aplicacion.ResumenCuenta;
+import co.edu.udea.aslan.shared.api.TokenBearer;
 import co.edu.udea.aslan.usuarios.aplicacion.ServicioAutenticacion;
-import co.edu.udea.aslan.usuarios.aplicacion.ServicioRegistro;
-import co.edu.udea.aslan.usuarios.aplicacion.SesionIniciada;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
@@ -16,22 +16,29 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/auth")
 public class AutenticacionController {
 
-    private final ServicioRegistro servicioRegistro;
     private final ServicioAutenticacion servicioAutenticacion;
 
-    public AutenticacionController(ServicioRegistro servicioRegistro, ServicioAutenticacion servicioAutenticacion) {
-        this.servicioRegistro = servicioRegistro;
+    public AutenticacionController(ServicioAutenticacion servicioAutenticacion) {
         this.servicioAutenticacion = servicioAutenticacion;
     }
 
     @PostMapping("/registro")
     @ResponseStatus(HttpStatus.CREATED)
-    public ResumenCuenta registrar(@Valid @RequestBody SolicitudRegistroDto solicitud) {
-        return servicioRegistro.registrar(solicitud.aSolicitud());
+    public RespuestaRegistroDto registrar(@Valid @RequestBody SolicitudRegistroDto solicitud) {
+        return RespuestaRegistroDto.desde(
+                servicioAutenticacion.registrar(solicitud.nombre(), solicitud.correo(), solicitud.contrasena()),
+                solicitud.correo());
     }
 
     @PostMapping("/login")
-    public SesionIniciada iniciarSesion(@Valid @RequestBody SolicitudLoginDto solicitud) {
-        return servicioAutenticacion.iniciarSesion(solicitud.correo(), solicitud.contrasena());
+    public RespuestaSesionDto iniciarSesion(@Valid @RequestBody SolicitudLoginDto solicitud) {
+        return RespuestaSesionDto.desde(
+                servicioAutenticacion.iniciarSesion(solicitud.correo(), solicitud.contrasena()));
+    }
+
+    @PostMapping("/logout")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void cerrarSesion(@RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String autorizacion) {
+        TokenBearer.extraer(autorizacion).ifPresent(servicioAutenticacion::cerrarSesion);
     }
 }
