@@ -310,6 +310,13 @@ function AuthLayout({
   )
 }
 
+function formatCountdown(totalSeconds: number) {
+  if (totalSeconds < 60) return `${totalSeconds} s`
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = String(totalSeconds % 60).padStart(2, "0")
+  return `${minutes}:${seconds} min`
+}
+
 function LoginScreen({
   onLogin,
   onRegister,
@@ -354,12 +361,18 @@ function LoginScreen({
     setBusy(false)
     if (result.ok) return onLogin(result.data)
     if (result.code === "LOCKED") {
-      setLockedUntil(result.lockedUntil ?? Date.now() + 30_000)
+      setLockedUntil(result.lockedUntil ?? Date.now() + 15 * 60_000)
       setNotice({
         type: "error",
         title: "Acceso bloqueado temporalmente",
         detail:
           "Alcanzaste el límite de intentos. Espera antes de volver a intentarlo.",
+      })
+    } else if (result.code === "SERVER_ERROR") {
+      setNotice({
+        type: "error",
+        title: "No pudimos iniciar sesión",
+        detail: result.message ?? "Ocurrió un error inesperado.",
       })
     } else {
       setNotice({
@@ -387,7 +400,7 @@ function LoginScreen({
                 lockedUntil
                 ? {
                   ...notice,
-                  detail: `${notice.detail} Podrás acceder en ${seconds} s.`,
+                  detail: `${notice.detail} Podrás acceder en ${formatCountdown(seconds)}.`,
                 }
                 : notice
               }
@@ -415,7 +428,7 @@ function LoginScreen({
             disabled={busy || Boolean(lockedUntil)}
             >
             {lockedUntil
-            ? `Espera ${seconds} s`
+            ? `Espera ${formatCountdown(seconds)}`
               : busy
               ? "Verificando..."
             : "Iniciar sesión"}

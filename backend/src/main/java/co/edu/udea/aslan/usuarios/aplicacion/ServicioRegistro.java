@@ -28,7 +28,7 @@ public class ServicioRegistro {
     }
 
     @Transactional
-    public CuentaRegistrada registrar(SolicitudRegistro solicitud) {
+    public ResumenCuenta registrar(SolicitudRegistro solicitud) {
         politica.verificar(solicitud.contrasena());
         String correo = Cuenta.normalizarCorreo(solicitud.correo());
         if (repositorioCuentas.existePorCorreo(correo)) {
@@ -36,6 +36,6 @@ public class ServicioRegistro {
         }
         Cuenta cuenta = Cuenta.registrar(solicitud.nombre(), correo,
                 cifrador.cifrar(solicitud.contrasena()), Instant.now(reloj));
-        return CuentaRegistrada.desde(repositorioCuentas.guardar(cuenta));
+        return ResumenCuenta.desde(repositorioCuentas.guardar(cuenta));
     }
 }

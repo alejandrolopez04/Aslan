@@ -4,6 +4,8 @@ import co.edu.udea.aslan.usuarios.dominio.Cuenta;
 import co.edu.udea.aslan.usuarios.dominio.IRepositorioCuentas;
 import org.springframework.stereotype.Repository;
 
+import java.util.Optional;
+
 @Repository
 class RepositorioCuentasJpa implements IRepositorioCuentas {
 
@@ -16,6 +18,11 @@ class RepositorioCuentasJpa implements IRepositorioCuentas {
     @Override
     public boolean existePorCorreo(String correo) {
         return jpa.existsByCorreo(correo);
+    }
+
+    @Override
+    public Optional<Cuenta> buscarPorCorreo(String correo) {
+        return jpa.findByCorreo(correo).map(CuentaEntidad::aDominio);
     }
 
     @Override

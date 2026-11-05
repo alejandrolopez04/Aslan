@@ -20,7 +20,8 @@ public class ManejadorErrores {
 
     @ExceptionHandler(ExcepcionNegocio.class)
     public ResponseEntity<RespuestaError> reglaDeNegocio(ExcepcionNegocio e) {
-        return responder(estadoPara(e.getTipo()), e.getCodigo(), e.getMessage());
+        return ResponseEntity.status(estadoPara(e.getTipo()))
+                .body(new RespuestaError(e.getCodigo(), e.getMessage(), e.getDetalles()));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
