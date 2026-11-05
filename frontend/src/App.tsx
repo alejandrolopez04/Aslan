@@ -447,7 +447,7 @@ function RegisterScreen({
   const [submitted, setSubmitted] = useState(false)
   const rules = {
     length: password.length >= 8,
-    uppercase: /[A-ZÁÉÍÓÚÑ]/.test(password),
+    letter: /\p{L}/u.test(password),
     number: /\d/.test(password),
   }
   const passwordValid = Object.values(rules).every(Boolean)
@@ -462,18 +462,26 @@ function RegisterScreen({
           type: "error",
           title: "La contraseña aún no es válida",
           detail:
-            "Debe tener al menos 8 caracteres, una mayúscula y un número.",
+            "Debe tener al menos 8 caracteres, una letra y un número.",
         })
       return
     }
     const result = await authGateway.register(name, email, password)
     if (!result.ok) {
-      setNotice({
-        type: "error",
-        title: "Este correo ya está en uso",
-        detail:
-          "Intenta iniciar sesión o utiliza otro correo para crear tu cuenta.",
-      })
+      setNotice(
+        result.code === "EMAIL_IN_USE"
+          ? {
+              type: "error",
+              title: "Este correo ya está en uso",
+              detail:
+                "Intenta iniciar sesión o utiliza otro correo para crear tu cuenta.",
+            }
+          : {
+              type: "error",
+              title: "No pudimos crear tu cuenta",
+              detail: result.message ?? "Ocurrió un error inesperado.",
+            },
+      )
       return
     }
     setNotice({
@@ -545,7 +553,7 @@ function RegisterScreen({
 function PasswordRequirements({ password }: { password: string }) {
   const checks = [
     [password.length >= 8, "8 caracteres"],
-    [/[A-ZÁÉÍÓÚÑ]/.test(password), "Una mayúscula"],
+    [/\p{L}/u.test(password), "Una letra"],
     [/\d/.test(password), "Un número"],
   ] as const
   return (
@@ -2000,6 +2008,16 @@ function ProfileScreen({
           type: "error",
           title: "Acceso temporalmente bloqueado",
           detail: "Espera antes de intentarlo nuevamente.",
+        },
+        INVALID_DATA: {
+          type: "error",
+          title: "Revisa los datos ingresados",
+          detail: result.message ?? "Los datos enviados no son válidos.",
+        },
+        SERVER_ERROR: {
+          type: "error",
+          title: "No fue posible guardar",
+          detail: result.message ?? "Ocurrió un error inesperado.",
         },
       }
       setNotice(messages[result.code])
